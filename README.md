@@ -25,7 +25,8 @@ Installation
 Clone the repository:
 
 bash
-git clone https://github.com/yourusername/attendance-analytics-system.git
+git clone https://github.com/Gaurav23-bit/attendance-analytics-system.git
+
 cd attendance-analytics-system
 Install dependencies:
 
