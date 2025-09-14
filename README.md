@@ -2,6 +2,7 @@ Automated Student Attendance Monitoring and Analytics System
 A smart, QR-code based app for automated student attendance, built for colleges and higher education institutions. This system streamlines roll call, reduces errors, provides powerful analytics, and supports NEP 2020 digital learning transformation.
 
 Features
+
 QR Code-Based Attendance: Each class session generates a unique QR code for secure, proxy-proof attendance marking.
 
 Automated Record-Keeping: Attendance data is securely logged and instantly available for review.
@@ -18,7 +19,9 @@ User-Friendly UI: Clean web interface for faculty and students; requires minimal
 
 Security & Integrity: Prevents proxy attendance and enforces session validity, time windows, and audit trails.
 
+
 Installation
+
 Clone the repository:
 
 bash
