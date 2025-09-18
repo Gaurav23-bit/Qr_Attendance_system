@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QR Attendance Dashboard</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg,#667eea,#7642), #764ba2;
+    margin: 0; padding: 20px; color: #333; text-align: center;
+  }
+  .container {
+    background: #fff; max-width: 480px; margin: auto;
+    border-radius: 15px; padding: 30px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.2);
+  }
+  h1 {
+    background: linear-gradient(135deg,#667eea,#764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 1rem;
+  }
+  img {
+    width: 250px; height: 250px; border-radius: 15px;
+    margin: 20px 0;
+  }
+  .timer, .interval-select {
+    background: #667eea; color: white;
+    font-size: 1.3rem;
+    padding: 10px 25px;
+    border-radius: 50px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    display: inline-block;
+    cursor: pointer;
+  }
+  .interval-select {
+    border-radius: 8px;
+    display: block;
+    width: fit-content;
+    padding: 8px;
+    font-size: 1rem;
+  }
+  .url {
+    font-family: monospace;
+    background: #f0f4f8;
+    padding: 12px;
+    border-radius: 8px;
+    word-break: break-word;
+  }
+  form {
+    margin-bottom: 30px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>QR Attendance</h1>
+
+  <form id="interval-form" method="post" action="{{ url_for('set_interval') }}">
+    <label for="interval">QR refresh interval: </label>
+    <select name="interval" id="interval" class="interval-select">
+      <option value="30" {% if interval == 30 %}selected{% endif %}>30 seconds</option>
+      <option value="45" {% if interval == 45 %}selected{% endif %}>45 seconds</option>
+      <option value="60" {% if interval == 60 %}selected{% endif %}>60 seconds</option>
+      <option value="90" {% if interval == 90 %}selected{% endif %}>90 seconds</option>
+    </select>
+  </form>
+
+  <img id="qr-img" src="{{ url_for('static', filename=qr_filename) }}?t={{ now_ts }}" alt="QR Code" />
+
+  <div class="timer" id="timer">{{ time_remaining }} seconds remaining</div>
+  
+  <div class="url" id="qr-url">{{ qr_url }}</div>
+</div>
+
+<script>
+  let remaining = {{ time_remaining }};
+  const timerEl = document.getElementById('timer');
+  const qrImg = document.getElementById('qr-img');
+  const qrUrl = document.getElementById('qr-url');
+  let reloading = false;
+
+  function updateTimer() {
+    timerEl.textContent = `${remaining} seconds remaining`;
+  }
+
+  async function refreshQR() {
+    if (reloading) return;
+    reloading = true;
+    try {
+      const resp = await fetch('{{ url_for("start_session") }}');
+      const data = await resp.json();
+      if (resp.ok && data.status === 'success') {
+        // Prefer server-provided absolute static URL if present
+        if (data.qr_static) {
+          qrImg.src = data.qr_static + '?t=' + new Date().getTime();
+        } else if (data.qr_filename) {
+          qrImg.src = '/static/' + data.qr_filename + '?t=' + new Date().getTime();
+        }
+        qrUrl.textContent = data.attend_url || data.qr_url || '';
+        remaining = data.time_remaining || remaining;
+        updateTimer();
+      } else {
+        console.error('Failed to refresh QR:', data.error || data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching new QR:', error);
+    } finally {
+      reloading = false;
+    }
+  }
+
+  const intervalId = setInterval(() => {
+    if (remaining > 0) {
+      remaining--;
+      updateTimer();
+    } else {
+      refreshQR();
+    }
+  }, 1000);
+
+  updateTimer();
+
+  // When the interval is changed, POST it via AJAX, update the timer and immediately refresh the QR.
+  document.getElementById('interval').addEventListener('change', async (e) => {
+    const val = e.target.value;
+    // send form-encoded POST to /set_interval
+    try {
+      const body = new URLSearchParams();
+      body.append('interval', val);
+  await fetch("{{ url_for('set_interval') }}", {
+        method: 'POST',
+        body: body,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+    } catch (err) {
+      console.error('Failed to set interval:', err);
+    }
+    remaining = parseInt(val, 10) || remaining;
+    updateTimer();
+    // small delay to allow server-side session to update, then regenerate QR
+    await new Promise(r => setTimeout(r, 200));
+    try {
+      await refreshQR();
+    } catch (e) {
+      console.error('refreshQR failed after interval change:', e);
+      // still try one more time after short delay
+      setTimeout(() => refreshQR(), 500);
+    }
+  });
+</script>
+
+</body>
+</html>
